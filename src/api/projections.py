@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -81,6 +82,7 @@ def project_task(
     tokens_in_total = 0
     tokens_out_total = 0
     duration_ms_total = 0
+    running_started_ts_ms: dict[str, int] = {}
 
     for ev in events:
         aliased = alias_stage(ev.stage)
@@ -93,6 +95,7 @@ def project_task(
                 agent=payload.get("agent"),
                 input=payload.get("input"),
             )
+            running_started_ts_ms[aliased] = ev.ts_ms
         elif ev.kind == "stage_finished":
             st = stages.get(aliased) or UiStage(name=aliased, status="running")
             st.status = "done"
@@ -112,6 +115,7 @@ def project_task(
                 tokens_out_total += st.tokens_out
             if isinstance(st.duration_ms, int):
                 duration_ms_total += st.duration_ms
+            running_started_ts_ms.pop(aliased, None)
         elif ev.kind == "stage_failed":
             st = stages.get(aliased) or UiStage(name=aliased, status="running")
             st.status = "failed"
@@ -119,6 +123,16 @@ def project_task(
             if "duration_ms" in payload:
                 st.duration_ms = payload.get("duration_ms")
             stages[aliased] = st
+            running_started_ts_ms.pop(aliased, None)
+
+    if running_started_ts_ms:
+        now_ms = int(time.time() * 1000)
+        for aliased, started in running_started_ts_ms.items():
+            elapsed = max(0, now_ms - started)
+            duration_ms_total += elapsed
+            st = stages.get(aliased)
+            if st is not None:
+                st.duration_ms = elapsed
 
     ui_events: list[UiEvent] | None = None
     if include_events:
