@@ -2,29 +2,45 @@ import type { JSX } from "react";
 import { ChevronRight } from "lucide-react";
 
 import type { UiTask } from "../api";
+import { useTaskStream } from "../useTaskStream";
 import { formatCost, formatDurationMs, formatTokens } from "../utils";
 import StatusChip from "./StatusChip";
 import StageStepper from "./StageStepper";
+import TaskDetails from "./TaskDetails";
 import { ROW_GRID } from "./gridTemplate";
 
 interface Props {
   task: UiTask;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-export default function TaskRow({ task }: Props): JSX.Element {
+export default function TaskRow({ task, expanded, onToggle }: Props): JSX.Element {
   const isRunning = task.status.toUpperCase() === "RUNNING";
   const tokensTotal = (task.tokens_in_total ?? 0) + (task.tokens_out_total ?? 0);
+  const stream = useTaskStream(expanded ? task.id : null);
 
   return (
     <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
       <div
         className={isRunning ? "selected-bar" : ""}
+        onClick={onToggle}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
         style={{
           display: "grid",
           gridTemplateColumns: ROW_GRID,
           alignItems: "center",
           gap: 14,
           padding: "11px 20px 11px 22px",
+          cursor: "pointer",
+          background: expanded ? "var(--bg-1)" : "transparent",
           transition: "background .12s",
         }}
       >
@@ -32,7 +48,7 @@ export default function TaskRow({ task }: Props): JSX.Element {
           className="ico-sm"
           style={{
             color: "var(--fg-2)",
-            transform: "rotate(0deg)",
+            transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
             transition: "transform .18s cubic-bezier(.2,.7,.3,1)",
             flexShrink: 0,
           }}
@@ -121,6 +137,15 @@ export default function TaskRow({ task }: Props): JSX.Element {
           </span>
         </span>
       </div>
+
+      {expanded && (
+        <TaskDetails
+          task={task}
+          events={stream.events}
+          connected={stream.connected}
+          streamError={stream.error}
+        />
+      )}
     </div>
   );
 }

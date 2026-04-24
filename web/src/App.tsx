@@ -25,6 +25,7 @@ function matchesFilter(task: UiTask, filter: TaskFilter): boolean {
 
 export default function App(): JSX.Element {
   const [filter, setFilter] = useState<TaskFilter>("all");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const tasksQuery = useQuery({
     queryKey: ["tasks"],
@@ -115,7 +116,14 @@ export default function App(): JSX.Element {
         {!loadError && !isLoading && filtered.length > 0 && (
           <div>
             {filtered.map((t) => (
-              <TaskRow key={t.id} task={t} />
+              <TaskRow
+                key={t.id}
+                task={t}
+                expanded={expandedId === t.id}
+                onToggle={() =>
+                  setExpandedId((cur) => (cur === t.id ? null : t.id))
+                }
+              />
             ))}
           </div>
         )}

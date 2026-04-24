@@ -12,18 +12,22 @@ interface Props {
   current?: string | null;
   size?: Size;
   showLabels?: boolean;
+  onStageClick?: (stageId: string) => void;
+  selectedStage?: string | null;
 }
 
 const SIZES: Record<Size, { dot: number; gap: number; labelFs: number; connH: number }> = {
   sm: { dot: 6, gap: 28, labelFs: 10, connH: 1 },
   md: { dot: 8, gap: 36, labelFs: 10.5, connH: 1 },
-  lg: { dot: 10, gap: 50, labelFs: 11, connH: 1.5 },
+  lg: { dot: 12, gap: 64, labelFs: 11, connH: 1.5 },
 };
 
 export default function StageStepper({
   stages,
   size = "md",
   showLabels = false,
+  onStageClick,
+  selectedStage,
 }: Props): JSX.Element {
   const sizes = SIZES[size];
 
@@ -61,6 +65,11 @@ export default function StageStepper({
         }
 
         const dotSize = sizes.dot + 6;
+        const isSelected = selectedStage === s.id;
+        const clickable = typeof onStageClick === "function";
+        const selectRing = isSelected ? "0 0 0 2px var(--accent)" : "";
+        const runRing = ring ? "0 0 0 3px var(--running-soft)" : "";
+        const rings = [selectRing, runRing].filter(Boolean).join(", ") || "none";
         const dotStyle: CSSProperties = {
           width: dotSize,
           height: dotSize,
@@ -68,9 +77,11 @@ export default function StageStepper({
           background: dotColor,
           display: "grid",
           placeItems: "center",
-          boxShadow: ring ? "0 0 0 3px var(--running-soft)" : "none",
+          boxShadow: rings,
           animation: ring ? "pulse-dot 1.4s ease-in-out infinite" : "none",
           flexShrink: 0,
+          cursor: clickable ? "pointer" : "default",
+          transition: "transform .15s",
         };
 
         const labelStyle: CSSProperties = {
@@ -89,6 +100,7 @@ export default function StageStepper({
           whiteSpace: "nowrap",
         };
 
+        const labelGap = showLabels ? dotSize + 22 : 0;
         return (
           <Fragment key={s.id}>
             <div
@@ -97,9 +109,34 @@ export default function StageStepper({
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
+                paddingBottom: labelGap,
               }}
             >
-              <div style={dotStyle}>{content}</div>
+              <div
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={
+                  clickable
+                    ? (e) => {
+                        e.stopPropagation();
+                        onStageClick?.(s.id);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  clickable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onStageClick?.(s.id);
+                        }
+                      }
+                    : undefined
+                }
+                style={dotStyle}
+              >
+                {content}
+              </div>
               {showLabels && <span style={labelStyle}>{s.label}</span>}
             </div>
             {idx < STAGES.length - 1 && (
