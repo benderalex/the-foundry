@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 
 import click
 import structlog
@@ -27,19 +28,49 @@ def main() -> None:
 
 
 @main.command()
-def run() -> None:
-    """Fetch open issues and run each through the full pipeline once."""
+@click.option("--once", is_flag=True, help="Run a single pass and exit (legacy behaviour).")
+@click.option(
+    "--interval",
+    type=int,
+    default=None,
+    help="Poll interval in seconds (overrides POLL_INTERVAL_SECONDS).",
+)
+def run(once: bool, interval: int | None) -> None:
+    """Fetch labeled issues and drive each through the pipeline.
+
+    By default runs forever, polling GitHub every POLL_INTERVAL_SECONDS.
+    Pass --once for a single pass (the old behaviour).
+    """
     try:
         settings = load_settings()
     except ConfigError as e:
         click.echo(f"config error: {e}", err=True)
         sys.exit(2)
 
-    processed = pipeline.run_once(settings)
-    for task in processed:
-        click.echo(
-            f"#{task.issue_number:>4}  {task.status.value:<8}  {task.current_stage.value:<10}  {task.pr_url or '-'}"
-        )
+    sleep_s = interval if interval is not None else settings.poll_interval_seconds
+    log = structlog.get_logger()
+
+    def _one_pass() -> None:
+        processed = pipeline.run_once(settings)
+        for task in processed:
+            click.echo(
+                f"#{task.issue_number:>4}  {task.status.value:<8}  {task.current_stage.value:<10}  {task.pr_url or '-'}"
+            )
+
+    if once:
+        _one_pass()
+        return
+
+    click.echo(f"foundry: polling every {sleep_s}s (Ctrl+C to stop)")
+    try:
+        while True:
+            try:
+                _one_pass()
+            except Exception:
+                log.exception("run.pass_failed")
+            time.sleep(sleep_s)
+    except KeyboardInterrupt:
+        click.echo("foundry: stopped")
 
 
 @main.command()
