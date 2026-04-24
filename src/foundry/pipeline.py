@@ -8,7 +8,7 @@ from langfuse import observe
 from . import observability, state, worktree
 from .agents import AgentSettings, AgentStage
 from .config import Settings
-from .events import stage_span
+from .events import read_events, record_event, stage_span
 from .models import Stage, Task, TaskStatus
 from .stages import agent_implement as agent_implement_stage
 from .stages import agent_plan as agent_plan_stage
@@ -43,6 +43,36 @@ def _process_task(settings: Settings, task: Task) -> Task:
     task.attempts += 1
     task.status = TaskStatus.RUNNING
     task = state.upsert_task(settings.db_path, task)
+
+    # `fetch` runs as a batch in `run_once` before tasks enter here, so there's
+    # no `stage_span` wrapping it. Emit synthetic started/finished events so the
+    # UI doesn't render fetch as "not yet executed". Idempotent on reruns after
+    # reset: if a `stage_finished` for fetch already exists, don't duplicate.
+    existing = read_events(settings.db_path, task_id=task.id)
+    has_fetch_finished = any(
+        e.stage == Stage.FETCH.value and e.kind == "stage_finished" for e in existing
+    )
+    if not has_fetch_finished:
+        record_event(
+            settings.db_path,
+            task.id,
+            Stage.FETCH.value,
+            "stage_started",
+            {"input": {"issue_number": task.issue_number, "repo": task.repo}},
+        )
+        record_event(
+            settings.db_path,
+            task.id,
+            Stage.FETCH.value,
+            "stage_finished",
+            {
+                "duration_ms": 0,
+                "output": {
+                    "issue_title": task.issue_title,
+                    "issue_number": task.issue_number,
+                },
+            },
+        )
 
     base = worktree.ensure_base_repo(settings.worktree_root, settings.source_repo)
     wt_path, branch_name = worktree.create_worktree(settings.worktree_root, task.id)

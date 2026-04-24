@@ -62,10 +62,58 @@ def test_run_once_happy_path(tmp_path: Path) -> None:
     per_stage_kinds: dict[str, list[str]] = {}
     for ev in events:
         per_stage_kinds.setdefault(ev.stage, []).append(ev.kind)
-    for stage_name in ("context", "plan", "implement", "verify", "pr"):
+    for stage_name in ("fetch", "context", "plan", "implement", "verify", "pr"):
         assert stage_name in per_stage_kinds, f"no events for stage {stage_name}"
         assert per_stage_kinds[stage_name][0] == "stage_started"
         assert per_stage_kinds[stage_name][-1] == "stage_finished"
+
+
+def test_fetch_events_are_not_duplicated_on_rerun(tmp_path: Path) -> None:
+    """A reset+rerun should not emit a second pair of fetch started/finished events."""
+    settings = _settings(tmp_path)
+    state.init_db(settings.db_path)
+    seeded = _seed_task(settings.db_path)
+
+    patches = {
+        "foundry.pipeline.fetch_stage.fetch": {"return_value": [seeded]},
+        "foundry.pipeline.worktree.ensure_base_repo": {"return_value": tmp_path / "base"},
+        "foundry.pipeline.worktree.create_worktree": {
+            "return_value": (tmp_path / "wt", "foundry/task-1"),
+        },
+        "foundry.pipeline.worktree.cleanup_worktree": {},
+        "foundry.pipeline.agent_plan_stage.run": {"return_value": {"plan": "", "summary": ""}},
+        "foundry.pipeline.agent_implement_stage.run": {"return_value": {"applied": []}},
+        "foundry.pipeline.verify_stage.run": {"return_value": {"passed": True}},
+        "foundry.pipeline.pr_stage.run": {
+            "return_value": {"pr_url": "https://example/pr/1", "branch": "foundry/task-1"},
+        },
+    }
+
+    def _run() -> None:
+        ctxs = [patch(target, **kwargs) for target, kwargs in patches.items()]
+        for ctx in ctxs:
+            ctx.start()
+        try:
+            pipeline.run_once(settings)
+        finally:
+            for ctx in ctxs:
+                ctx.stop()
+
+    _run()
+    task_id = state.list_tasks(settings.db_path)[0].id
+    # Simulate a reset: drop pr_url so the task isn't skipped, then rerun.
+    task = state.get_task(settings.db_path, task_id)
+    task.pr_url = None
+    task.status = TaskStatus.PENDING
+    task.current_stage = Stage.FETCH
+    state.upsert_task(settings.db_path, task)
+    _run()
+
+    events = read_events(settings.db_path, task_id=task_id)
+    fetch_started = [e for e in events if e.stage == "fetch" and e.kind == "stage_started"]
+    fetch_finished = [e for e in events if e.stage == "fetch" and e.kind == "stage_finished"]
+    assert len(fetch_started) == 1
+    assert len(fetch_finished) == 1
 
 
 def test_run_once_pre_implement_failure_requeues(tmp_path: Path) -> None:
