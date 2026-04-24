@@ -114,3 +114,43 @@ def test_apply_runs_in_worktree_cwd(tmp_path: Path) -> None:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
     assert run.call_args.kwargs["cwd"] == tmp_path
+
+
+def test_extract_usage_maps_all_token_fields() -> None:
+    events = [
+        {"type": "system", "session_id": "s"},
+        {
+            "type": "result",
+            "result": "ok",
+            "usage": {
+                "input_tokens": 120,
+                "output_tokens": 45,
+                "cache_read_input_tokens": 800,
+                "cache_creation_input_tokens": 30,
+            },
+        },
+    ]
+
+    got = ClaudeCliAgent._extract_usage(events)
+
+    assert got == {
+        "input": 120,
+        "output": 45,
+        "cache_read_input": 800,
+        "cache_creation_input": 30,
+    }
+
+
+def test_extract_usage_returns_none_when_missing() -> None:
+    events = [{"type": "result", "result": "ok"}]
+
+    assert ClaudeCliAgent._extract_usage(events) is None
+
+
+def test_extract_model_reads_from_result_event() -> None:
+    events = [
+        {"type": "system", "session_id": "s"},
+        {"type": "result", "result": "ok", "model": "claude-haiku-4-5-20250902"},
+    ]
+
+    assert ClaudeCliAgent._extract_model(events) == "claude-haiku-4-5-20250902"

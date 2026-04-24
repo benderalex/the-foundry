@@ -98,3 +98,40 @@ def test_apply_passes_model_dir_and_format(tmp_path: Path) -> None:
     assert cmd[cmd.index("--dir") + 1] == str(tmp_path)
     assert cmd[cmd.index("-m") + 1] == "openrouter/x-ai/grok"
     assert run.call_args.kwargs["cwd"] == tmp_path
+
+
+def test_extract_usage_from_metadata_tokens() -> None:
+    events = [
+        {"type": "text", "part": {"text": "hi"}},
+        {
+            "type": "step_finish",
+            "metadata": {
+                "tokens": {
+                    "input": 200,
+                    "output": 60,
+                    "cache": {"read": 500, "write": 10},
+                }
+            },
+        },
+    ]
+
+    got = OpencodeCliAgent._extract_usage(events)
+
+    assert got == {
+        "input": 200,
+        "output": 60,
+        "cache_read_input": 500,
+        "cache_creation_input": 10,
+    }
+
+
+def test_extract_usage_from_top_level_tokens() -> None:
+    events = [{"type": "step_finish", "tokens": {"input": 15, "output": 7}}]
+
+    assert OpencodeCliAgent._extract_usage(events) == {"input": 15, "output": 7}
+
+
+def test_extract_usage_returns_none_when_missing() -> None:
+    events = [{"type": "text", "part": {"text": "hi"}}]
+
+    assert OpencodeCliAgent._extract_usage(events) is None

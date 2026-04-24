@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .. import observability
 from .base import (
     AgentResult,
     AgentStage,
@@ -51,13 +52,21 @@ class OpencodeCliAgent:
             cmd += ["--session", resume_id]
         cmd.append(message)
 
-        events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
+        with observability.track_generation(
+            name="llm.opencode_cli",
+            model=self._settings.model or None,
+            input=message,
+        ) as gen:
+            events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
 
-        new_session_id = self._extract_session_id(events)
-        if new_session_id:
-            self._sessions[task.id] = new_session_id
+            new_session_id = self._extract_session_id(events)
+            if new_session_id:
+                self._sessions[task.id] = new_session_id
 
-        response = self._extract_final_text(events)
+            response = self._extract_final_text(events)
+            usage = self._extract_usage(events)
+            observability.update_generation(gen, output=response, usage=usage)
+
         return AgentResult(
             stage=self.stage,
             response=response,
@@ -91,3 +100,34 @@ class OpencodeCliAgent:
             if text:
                 chunks.append(str(text))
         return "".join(chunks)
+
+    @staticmethod
+    def _extract_usage(events: list[dict]) -> dict[str, int] | None:
+        """Pull token counts from whichever opencode event carries them.
+
+        Field names vary by opencode version; checks several likely paths
+        (top-level `tokens`, `metadata.tokens`, `part.tokens`, message
+        metadata) and returns the first hit.
+        """
+        for event in reversed(events):
+            tokens = (
+                event.get("tokens")
+                or (event.get("metadata") or {}).get("tokens")
+                or (event.get("part") or {}).get("tokens")
+                or (event.get("message") or {}).get("metadata", {}).get("tokens")
+            )
+            if not isinstance(tokens, dict) or not tokens:
+                continue
+            out: dict[str, int] = {}
+            if "input" in tokens:
+                out["input"] = int(tokens["input"])
+            if "output" in tokens:
+                out["output"] = int(tokens["output"])
+            cache = tokens.get("cache")
+            if isinstance(cache, dict):
+                if "read" in cache:
+                    out["cache_read_input"] = int(cache["read"])
+                if "write" in cache:
+                    out["cache_creation_input"] = int(cache["write"])
+            return out or None
+        return None

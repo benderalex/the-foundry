@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .. import observability
 from .base import (
     AgentResult,
     AgentStage,
@@ -43,13 +44,21 @@ class CodexCliAgent:
             prompt = input
             cmd = self._resume_cmd(worktree, resume_id, prompt)
 
-        events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
+        with observability.track_generation(
+            name="llm.codex_cli",
+            model=self._settings.model or None,
+            input=prompt,
+        ) as gen:
+            events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
 
-        new_session_id = self._extract_session_id(events)
-        if new_session_id:
-            self._sessions[task.id] = new_session_id
+            new_session_id = self._extract_session_id(events)
+            if new_session_id:
+                self._sessions[task.id] = new_session_id
 
-        response = self._extract_final_text(events)
+            response = self._extract_final_text(events)
+            usage = self._extract_usage(events)
+            observability.update_generation(gen, output=response, usage=usage)
+
         return AgentResult(
             stage=self.stage,
             response=response,
@@ -98,3 +107,27 @@ class CodexCliAgent:
             if item.get("type") == "agent_message" and "text" in item:
                 return str(item["text"])
         return ""
+
+    @staticmethod
+    def _extract_usage(events: list[dict]) -> dict[str, int] | None:
+        """Pull token counts from the final `token_count` event.
+
+        Codex emits one or more `token_count` events; the last one carries the
+        cumulative total for the run. Field names can be either top-level
+        (`input_tokens`) or nested under `usage` / `info`.
+        """
+        for event in reversed(events):
+            if event.get("type") != "token_count":
+                continue
+            src = event.get("usage") or event.get("info") or event
+            if not isinstance(src, dict):
+                continue
+            out: dict[str, int] = {}
+            if "input_tokens" in src:
+                out["input"] = int(src["input_tokens"])
+            if "output_tokens" in src:
+                out["output"] = int(src["output_tokens"])
+            if "cached_input_tokens" in src:
+                out["cache_read_input"] = int(src["cached_input_tokens"])
+            return out or None
+        return None

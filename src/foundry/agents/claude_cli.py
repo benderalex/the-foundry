@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .. import observability
 from .base import (
     AgentResult,
     AgentStage,
@@ -58,13 +59,24 @@ class ClaudeCliAgent:
         if resume_id:
             cmd += ["--resume", resume_id]
 
-        events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
+        with observability.track_generation(
+            name="llm.claude_cli",
+            model=self._settings.model or None,
+            input=prompt,
+        ) as gen:
+            events = run_cli_jsonl(cmd, cwd=worktree, timeout_sec=self._settings.timeout_sec)
 
-        new_session_id = self._extract_session_id(events)
-        if new_session_id:
-            self._sessions[task.id] = new_session_id
+            new_session_id = self._extract_session_id(events)
+            if new_session_id:
+                self._sessions[task.id] = new_session_id
 
-        response = self._extract_final_text(events)
+            response = self._extract_final_text(events)
+            usage = self._extract_usage(events)
+            actual_model = self._extract_model(events) or self._settings.model or None
+            observability.update_generation(
+                gen, output=response, usage=usage, model=actual_model
+            )
+
         return AgentResult(
             stage=self.stage,
             response=response,
@@ -93,3 +105,32 @@ class ClaudeCliAgent:
                     if block.get("type") == "text":
                         return str(block.get("text", ""))
         return ""
+
+    @staticmethod
+    def _extract_usage(events: list[dict]) -> dict[str, int] | None:
+        """Pull token counts from the final `result` event's `usage` payload."""
+        for event in reversed(events):
+            if event.get("type") != "result":
+                continue
+            usage = event.get("usage") or {}
+            if not isinstance(usage, dict) or not usage:
+                continue
+            out: dict[str, int] = {}
+            if "input_tokens" in usage:
+                out["input"] = int(usage["input_tokens"])
+            if "output_tokens" in usage:
+                out["output"] = int(usage["output_tokens"])
+            if "cache_read_input_tokens" in usage:
+                out["cache_read_input"] = int(usage["cache_read_input_tokens"])
+            if "cache_creation_input_tokens" in usage:
+                out["cache_creation_input"] = int(usage["cache_creation_input_tokens"])
+            return out or None
+        return None
+
+    @staticmethod
+    def _extract_model(events: list[dict]) -> str | None:
+        """Read the fully-qualified model id from the `result` event."""
+        for event in reversed(events):
+            if event.get("type") == "result" and event.get("model"):
+                return str(event["model"])
+        return None
