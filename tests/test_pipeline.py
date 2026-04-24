@@ -41,7 +41,8 @@ def test_run_once_happy_path(tmp_path: Path) -> None:
              return_value=(tmp_path / "wt", "foundry/task-1"),
          ), \
          patch("foundry.pipeline.worktree.cleanup_worktree"), \
-         patch("foundry.pipeline.implement_stage.run", return_value={"applied": []}), \
+         patch("foundry.pipeline.agent_plan_stage.run", return_value={"plan": "", "summary": ""}), \
+         patch("foundry.pipeline.agent_implement_stage.run", return_value={"applied": []}), \
          patch("foundry.pipeline.verify_stage.run", return_value={"passed": True}), \
          patch(
              "foundry.pipeline.pr_stage.run",
@@ -87,7 +88,8 @@ def test_run_once_stage_failure_marks_failed(tmp_path: Path) -> None:
              return_value=(tmp_path / "wt", "foundry/task-1"),
          ), \
          patch("foundry.pipeline.worktree.cleanup_worktree"), \
-         patch("foundry.pipeline.implement_stage.run", side_effect=RuntimeError("boom")):
+         patch("foundry.pipeline.agent_plan_stage.run", return_value={"plan": "", "summary": ""}), \
+         patch("foundry.pipeline.agent_implement_stage.run", side_effect=RuntimeError("boom")):
         processed = pipeline.run_once(settings)
 
     final = state.get_task(settings.db_path, processed[0].id)

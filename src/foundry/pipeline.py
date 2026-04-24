@@ -7,10 +7,10 @@ import structlog
 from . import state, worktree
 from .config import Settings
 from .models import Stage, Task, TaskStatus
+from .stages import agent_implement as agent_implement_stage
+from .stages import agent_plan as agent_plan_stage
 from .stages import context as context_stage
 from .stages import fetch as fetch_stage
-from .stages import implement as implement_stage
-from .stages import plan as plan_stage
 from .stages import pr as pr_stage
 from .stages import verify as verify_stage
 
@@ -53,12 +53,12 @@ def _process_task(settings: Settings, task: Task) -> Task:
 
     # PLAN
     task = _mark(settings, task, stage=Stage.PLAN)
-    plan = plan_stage.run(task, ctx, settings)
-    state.append_log(settings.db_path, task.id, Stage.PLAN, {"steps": len(plan.get("steps", []))})
+    plan = agent_plan_stage.run(task, ctx, wt_path, settings)
+    state.append_log(settings.db_path, task.id, Stage.PLAN, {"summary": plan.get("summary", "")})
 
     # IMPLEMENT
     task = _mark(settings, task, stage=Stage.IMPLEMENT)
-    impl_result = implement_stage.run(task, plan, wt_path, settings)
+    impl_result = agent_implement_stage.run(task, plan, wt_path, settings)
     state.append_log(settings.db_path, task.id, Stage.IMPLEMENT, impl_result)
 
     # VERIFY
