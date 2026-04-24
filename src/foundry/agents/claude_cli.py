@@ -83,19 +83,28 @@ class ClaudeCliAgent:
 
             response = self._extract_final_text(events)
             usage = self._extract_usage(events)
+            cost_usd = self._extract_cost_usd(events)
             actual_model = self._extract_model(events) or self._settings.model or None
             observability.update_generation(
                 gen, output=response, usage=usage, model=actual_model
             )
 
-            # Final agent_result breadcrumb — first line of the response,
-            # stable regardless of how many text blocks we streamed.
-            self._record(task, kind="agent_result", payload={"summary": first_line(response)})
+            # Final agent_result breadcrumb — summary (first line) for a
+            # compact row in the event stream, and `text` (full response) so
+            # the UI can render a collapsible "show full answer" block.
+            self._record(
+                task,
+                kind="agent_result",
+                payload={"summary": first_line(response), "text": response},
+            )
 
         return AgentResult(
             stage=self.stage,
             response=response,
             result=first_line(response),
+            cost_usd=cost_usd,
+            tokens_in=(usage or {}).get("input") if usage else None,
+            tokens_out=(usage or {}).get("output") if usage else None,
         )
 
     def get_session_id(self, task: AgentTask) -> str | None:
@@ -178,6 +187,21 @@ class ClaudeCliAgent:
             if "cache_creation_input_tokens" in usage:
                 out["cache_creation_input"] = int(usage["cache_creation_input_tokens"])
             return out or None
+        return None
+
+    @staticmethod
+    def _extract_cost_usd(events: list[dict]) -> float | None:
+        """Pull `total_cost_usd` from the final `result` event, if present."""
+        for event in reversed(events):
+            if event.get("type") != "result":
+                continue
+            cost = event.get("total_cost_usd")
+            if cost is None:
+                return None
+            try:
+                return float(cost)
+            except (TypeError, ValueError):
+                return None
         return None
 
     @staticmethod

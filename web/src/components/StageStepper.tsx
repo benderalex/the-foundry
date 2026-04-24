@@ -35,10 +35,6 @@ export default function StageStepper({
     <div style={{ display: "flex", alignItems: "center" }}>
       {STAGES.map((s, idx) => {
         const st = stages[s.id] ?? { name: s.id, status: "pending" as const };
-        const next =
-          idx < STAGES.length - 1
-            ? (stages[STAGES[idx + 1].id] ?? { name: STAGES[idx + 1].id, status: "pending" as const })
-            : null;
         const isDone = st.status === "done";
         const isRunning = st.status === "running";
         const isFailed = st.status === "failed";
@@ -59,10 +55,9 @@ export default function StageStepper({
           content = <X style={{ width: 7, height: 7, color: "#fff", strokeWidth: 3 }} />;
         }
 
-        let connColor = "var(--border)";
-        if (isDone && next && (next.status === "done" || next.status === "running" || next.status === "failed")) {
-          connColor = "var(--success)";
-        }
+        // Connector color depends ONLY on the left-hand stage, so the line
+        // doesn't flicker when the right-hand neighbor changes state.
+        const connColor = isDone ? "var(--success)" : "var(--border-strong)";
 
         const dotSize = sizes.dot + 6;
         const isSelected = selectedStage === s.id;
@@ -147,6 +142,10 @@ export default function StageStepper({
                   background: connColor,
                   flexShrink: 0,
                   transition: "background .3s",
+                  // Compensate the parent's paddingBottom (used to reserve
+                  // space for the label) so the connector stays horizontally
+                  // aligned with the center of the dots.
+                  marginBottom: labelGap,
                 }}
               />
             )}

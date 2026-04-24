@@ -28,4 +28,7 @@ def run(task: Task, ctx: dict, worktree_path: Path, settings: Settings) -> dict:
         "stage": r.stage.value,
         "plan": r.response,
         "summary": r.result,
+        "cost_usd": r.cost_usd,
+        "tokens_in": r.tokens_in,
+        "tokens_out": r.tokens_out,
     }

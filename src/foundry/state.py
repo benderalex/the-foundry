@@ -96,10 +96,10 @@ def get_task(db_path: Path, task_id: int) -> Task | None:
 def list_tasks(db_path: Path, status: TaskStatus | None = None) -> list[Task]:
     with _connect(db_path) as conn:
         if status is None:
-            rows = conn.execute("SELECT * FROM tasks ORDER BY id").fetchall()
+            rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM tasks WHERE status = ? ORDER BY id",
+                "SELECT * FROM tasks WHERE status = ? ORDER BY id DESC",
                 (status.value,),
             ).fetchall()
         return [_row_to_task(r) for r in rows]

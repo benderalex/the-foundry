@@ -57,6 +57,19 @@ def test_list_tasks_filter_by_status(tmp_path: Path) -> None:
     assert [t.issue_number for t in done] == [2]
 
 
+def test_list_tasks_sorted_desc_by_id(tmp_path: Path) -> None:
+    db = tmp_path / "f.sqlite"
+    state.init_db(db)
+
+    t1 = state.upsert_task(db, _make_task(1))
+    t2 = state.upsert_task(db, _make_task(2))
+    t3 = state.upsert_task(db, _make_task(3))
+
+    tasks = state.list_tasks(db)
+
+    assert [t.id for t in tasks] == [t3.id, t2.id, t1.id]
+
+
 def test_append_log_accumulates(tmp_path: Path) -> None:
     db = tmp_path / "f.sqlite"
     state.init_db(db)

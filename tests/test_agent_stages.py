@@ -56,6 +56,9 @@ def test_agent_plan_delegates_to_plan_agent_and_returns_full_response(tmp_path: 
         "stage": "plan",
         "plan": "full plan text\nstep 1",
         "summary": "full plan text",
+        "cost_usd": None,
+        "tokens_in": None,
+        "tokens_out": None,
     }
 
 
@@ -84,6 +87,9 @@ def test_agent_implement_feeds_plan_text_to_implement_agent(tmp_path: Path) -> N
         "stage": "implement",
         "result": "changed 2 files",
         "response": "changed 2 files",
+        "cost_usd": None,
+        "tokens_in": None,
+        "tokens_out": None,
     }
 
 

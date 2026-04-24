@@ -68,7 +68,12 @@ def _process_task(settings: Settings, task: Task) -> Task:
         agent={"name": plan_agent_settings.backend, "model": plan_agent_settings.model},
     ) as finish:
         plan = agent_plan_stage.run(task, ctx, wt_path, settings)
-        finish(output={"summary": plan.get("summary", "")})
+        finish(
+            output={"summary": plan.get("summary", ""), "text": plan.get("plan", "")},
+            cost_usd=plan.get("cost_usd"),
+            tokens_in=plan.get("tokens_in"),
+            tokens_out=plan.get("tokens_out"),
+        )
     state.append_log(settings.db_path, task.id, Stage.PLAN, {"summary": plan.get("summary", "")})
 
     # IMPLEMENT
@@ -82,7 +87,15 @@ def _process_task(settings: Settings, task: Task) -> Task:
         agent={"name": impl_agent_settings.backend, "model": impl_agent_settings.model},
     ) as finish:
         impl_result = agent_implement_stage.run(task, plan, wt_path, settings)
-        finish(output={"result": impl_result.get("result", "")})
+        finish(
+            output={
+                "summary": impl_result.get("result", ""),
+                "text": impl_result.get("response", ""),
+            },
+            cost_usd=impl_result.get("cost_usd"),
+            tokens_in=impl_result.get("tokens_in"),
+            tokens_out=impl_result.get("tokens_out"),
+        )
     state.append_log(settings.db_path, task.id, Stage.IMPLEMENT, impl_result)
 
     # VERIFY

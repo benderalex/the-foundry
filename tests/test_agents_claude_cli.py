@@ -149,6 +149,44 @@ def test_extract_usage_returns_none_when_missing() -> None:
     assert ClaudeCliAgent._extract_usage(events) is None
 
 
+def test_extract_cost_usd_pulls_total_cost_from_result_event() -> None:
+    events = [
+        {"type": "system", "session_id": "s"},
+        {"type": "result", "result": "ok", "total_cost_usd": 0.1234},
+    ]
+
+    assert ClaudeCliAgent._extract_cost_usd(events) == 0.1234
+
+
+def test_extract_cost_usd_returns_none_when_missing() -> None:
+    events = [{"type": "result", "result": "ok"}]
+
+    assert ClaudeCliAgent._extract_cost_usd(events) is None
+
+
+def test_apply_populates_cost_and_tokens_from_result_event(tmp_path: Path) -> None:
+    agent = ClaudeCliAgent(settings=_settings())
+    streamed = [
+        {"type": "system", "session_id": "s"},
+        {
+            "type": "result",
+            "result": "ok",
+            "total_cost_usd": 0.042,
+            "usage": {"input_tokens": 200, "output_tokens": 75},
+        },
+    ]
+
+    with patch(
+        "foundry.agents.claude_cli.iter_cli_jsonl",
+        return_value=iter(streamed),
+    ):
+        out = agent.apply(task=_task(), worktree=tmp_path, input="")
+
+    assert out.cost_usd == 0.042
+    assert out.tokens_in == 200
+    assert out.tokens_out == 75
+
+
 def test_extract_model_from_modelUsage_keys() -> None:
     events = [
         {"type": "system", "session_id": "s"},
@@ -204,7 +242,8 @@ def test_claude_cli_emits_agent_tool_events_during_apply(tmp_path: Path) -> None
     assert result.response == "final line\nmore"
     assert result.result == "final line"
 
-    kinds = [(e.kind, e.seq) for e in read_events(db, task_id=101)]
+    events = read_events(db, task_id=101)
+    kinds = [(e.kind, e.seq) for e in events]
     kind_names = [k for k, _ in kinds]
     assert "agent_tool" in kind_names
     assert "agent_text" in kind_names
@@ -213,6 +252,12 @@ def test_claude_cli_emits_agent_tool_events_during_apply(tmp_path: Path) -> None
     tool_seq = next(seq for k, seq in kinds if k == "agent_tool")
     result_seq = next(seq for k, seq in kinds if k == "agent_result")
     assert tool_seq < result_seq
+
+    # agent_result payload carries both a short summary (first line) and
+    # the full text, so the UI can show a collapsible "full answer" block.
+    result_event = next(e for e in events if e.kind == "agent_result")
+    assert result_event.payload["summary"] == "final line"
+    assert result_event.payload["text"] == "final line\nmore"
 
 
 def test_claude_cli_skips_event_emission_without_db_path(tmp_path: Path) -> None:

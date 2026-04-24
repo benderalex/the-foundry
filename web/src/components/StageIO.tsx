@@ -215,6 +215,28 @@ export default function StageIO({ data }: Props): JSX.Element {
     return <PendingBlock label={data.label as string | undefined} />;
   }
 
+  // Stage output shape emitted by pipeline.py for plan/implement:
+  // { summary: <first line>, text: <full agent response> }.
+  if (typeof data.summary === "string" && typeof data.text === "string") {
+    const summary = data.summary;
+    const text = data.text;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          style={{
+            fontSize: 12.5,
+            color: "var(--fg-0)",
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          {summary || <span className="dim">—</span>}
+        </div>
+        {text && text !== summary && <TextBlock text={text} />}
+      </div>
+    );
+  }
+
   // Fallback: render unknown dicts as key-value pairs.
   const entries = Object.entries(data).filter(
     ([k]) => k !== "kind" && k !== "truncated" && k !== "original_size",

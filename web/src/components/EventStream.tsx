@@ -67,6 +67,62 @@ function ThinkingRow({ event }: { event: UiEvent }): JSX.Element {
   );
 }
 
+function AgentResultRow({ event }: { event: UiEvent }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const summary = getString(event.payload, "summary");
+  const text = getString(event.payload, "text");
+  const hasFullText = text.length > 0 && text !== summary;
+  return (
+    <div className="event-row">
+      <span className="event-ico">📝</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            color: "var(--fg-0)",
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Final: {summary}
+        </div>
+        {hasFullText && (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              style={{
+                marginTop: 4,
+                fontSize: 10.5,
+                color: "var(--accent)",
+                cursor: "pointer",
+              }}
+            >
+              {open ? "свернуть" : "показать полный ответ"}
+            </button>
+            {open && (
+              <pre
+                className="mono"
+                style={{
+                  margin: "4px 0 0",
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  color: "var(--fg-1)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  background: "transparent",
+                }}
+              >
+                {text}
+              </pre>
+            )}
+          </>
+        )}
+      </div>
+      <span className="event-ts mono">{fmtTs(event.ts_ms)}</span>
+    </div>
+  );
+}
+
 function renderEvent(event: UiEvent): JSX.Element | null {
   const payload = event.payload ?? {};
 
@@ -125,24 +181,7 @@ function renderEvent(event: UiEvent): JSX.Element | null {
   }
 
   if (event.kind === "agent_result") {
-    const summary = getString(payload, "summary");
-    return (
-      <div className="event-row" key={event.seq}>
-        <span className="event-ico">📝</span>
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            color: "var(--fg-0)",
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          Final: {summary}
-        </div>
-        <span className="event-ts mono">{fmtTs(event.ts_ms)}</span>
-      </div>
-    );
+    return <AgentResultRow key={event.seq} event={event} />;
   }
 
   // stage_started / stage_finished / stage_failed — rendered in stage header, skip.

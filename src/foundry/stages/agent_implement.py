@@ -30,4 +30,7 @@ def run(task: Task, plan: dict, worktree_path: Path, settings: Settings) -> dict
         "stage": r.stage.value,
         "result": r.result,
         "response": r.response,
+        "cost_usd": r.cost_usd,
+        "tokens_in": r.tokens_in,
+        "tokens_out": r.tokens_out,
     }
