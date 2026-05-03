@@ -353,7 +353,11 @@ def _task_for_pr(settings: Settings, pr: dict[str, Any]) -> Task | None:
 def _prepare_pr_feedback_worktree(
     settings: Settings, task: Task, branch_name: str
 ) -> tuple[Path, Path]:
-    base = worktree.ensure_base_repo(settings.worktree_root, settings.source_repo)
+    base = worktree.ensure_base_repo(
+        settings.worktree_root,
+        settings.source_repo,
+        settings.base_branch,
+    )
     wt_path = (settings.worktree_root / f"task-{task.id}-pr-feedback").resolve()
     if wt_path.exists():
         worktree.cleanup_worktree(base, wt_path)
@@ -445,7 +449,11 @@ def _prepare_dev_worktree(settings: Settings, task: Task, base: Path) -> tuple[T
             expected_path=str(canonical_path),
         )
 
-    wt_path, branch_name = worktree.create_worktree(settings.worktree_root, task.id)
+    wt_path, branch_name = worktree.create_worktree(
+        settings.worktree_root,
+        task.id,
+        settings.base_branch,
+    )
     task.worktree_path = str(wt_path)
     task.branch_name = branch_name
     task = state.upsert_task(settings.db_path, task)
@@ -477,7 +485,11 @@ def dev_task(settings: Settings, task: Task) -> Task:
 
     _emit_synthetic_fetch_events(settings, task)
 
-    base = worktree.ensure_base_repo(settings.worktree_root, settings.source_repo)
+    base = worktree.ensure_base_repo(
+        settings.worktree_root,
+        settings.source_repo,
+        settings.base_branch,
+    )
     task, wt_path, branch_name = _prepare_dev_worktree(settings, task, base)
 
     # CONTEXT

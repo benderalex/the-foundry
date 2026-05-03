@@ -31,3 +31,23 @@ def test_create_worktree_removes_stale_branch_before_add(tmp_path: Path) -> None
         base,
         True,
     )
+
+
+def test_ensure_base_repo_syncs_configured_base_branch(tmp_path: Path) -> None:
+    root = tmp_path / "worktrees"
+    base = root / "_base"
+    base.mkdir(parents=True)
+    calls: list[tuple[list[str], Path | None]] = []
+
+    def fake_run(cmd: list[str], cwd: Path | None = None, **kwargs):
+        calls.append((cmd, cwd))
+
+    with patch("foundry.worktree.shell.run", side_effect=fake_run):
+        out = worktree.ensure_base_repo(root, "owner/sandbox", "develop")
+
+    assert out == base
+    assert calls == [
+        (["git", "fetch", "origin"], base),
+        (["git", "checkout", "develop"], base),
+        (["git", "reset", "--hard", "origin/develop"], base),
+    ]

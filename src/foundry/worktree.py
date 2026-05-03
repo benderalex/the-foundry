@@ -11,18 +11,26 @@ def base_repo_path(worktree_root: Path) -> Path:
     return worktree_root / BASE_DIR_NAME
 
 
-def ensure_base_repo(worktree_root: Path, source_repo: str) -> Path:
-    """Clone source_repo into worktree_root/_base if not present, then fetch."""
+def ensure_base_repo(
+    worktree_root: Path,
+    source_repo: str,
+    base_branch: str = "main",
+) -> Path:
+    """Clone source_repo into worktree_root/_base and sync base_branch."""
     worktree_root.mkdir(parents=True, exist_ok=True)
     base = base_repo_path(worktree_root)
     if not base.exists():
         shell.run(["gh", "repo", "clone", source_repo, str(base), "--", "--no-checkout"])
         shell.run(["git", "fetch", "origin"], cwd=base)
-        shell.run(["git", "checkout", "main"], cwd=base)
+        shell.run(["git", "checkout", base_branch], cwd=base)
     else:
         shell.run(["git", "fetch", "origin"], cwd=base)
-        shell.run(["git", "checkout", "main"], cwd=base)
-        shell.run(["git", "reset", "--hard", "origin/main"], cwd=base, allow_unsafe=True)
+        shell.run(["git", "checkout", base_branch], cwd=base)
+        shell.run(
+            ["git", "reset", "--hard", f"origin/{base_branch}"],
+            cwd=base,
+            allow_unsafe=True,
+        )
     return base
 
 

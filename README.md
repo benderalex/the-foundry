@@ -77,6 +77,7 @@ Stub-режим хорош для smoke-теста (оффлайн, детерм
 
 SOURCE_REPO=your-org/the-foundry-sandbox
 TARGET_REPO=your-org/the-foundry-sandbox
+BASE_BRANCH=main
 ISSUE_LABEL=agent-task
 # Optional: narrow or split the queue without changing code.
 # ISSUE_LABELS=agent-task,queue/backend
@@ -98,6 +99,39 @@ AGENT_IMPLEMENT_MAX_TURNS=40
 ```
 
 Все доступные ключи и оверрайды задокументированы в [.env.example](.env.example) (в т.ч. `codex_cli`, `opencode_cli` и опциональный Langfuse-трейсинг).
+
+### Прогон на `podlodka-ai-club/the-foundry`
+
+Для dogfood-прогона на реальном репозитории можно использовать тот же репозиторий как источник issue и цель PR. Создай отдельный лейбл, чтобы listener не забрал случайные issue:
+
+```bash
+gh label create foundry-task --repo podlodka-ai-club/the-foundry --color 5319e7 || true
+```
+
+Минимальный `.env`:
+
+```bash
+SOURCE_REPO=podlodka-ai-club/the-foundry
+TARGET_REPO=podlodka-ai-club/the-foundry
+BASE_BRANCH=main
+ISSUE_LABEL=foundry-task
+CODING_AGENT=codex_cli
+AGENT_MODEL=gpt-5
+AGENT_TIMEOUT_SEC=900
+AGENT_MAX_TURNS=20
+AGENT_IMPLEMENT_MAX_TURNS=40
+VERIFY_COMMANDS=[["ruff","check","."],["pytest","-x","--no-header","-q"]]
+```
+
+Дальше заведи небольшое issue с лейблом `foundry-task` и запусти один проход:
+
+```bash
+uv run foundry run-issue <issue-number>
+# или, если хочешь проверить polling-фильтры:
+uv run foundry run --once
+```
+
+`BASE_BRANCH` используется и для синхронизации `_base`, и для `git worktree add`, и как `--base` при создании PR. Если default branch проекта переименуют, достаточно поменять одну переменную.
 
 ### Безопасность и rollback
 

@@ -44,7 +44,7 @@ def run(
             "gh", "pr", "create",
             "--repo", settings.target_repo,
             "--head", branch_name,
-            "--base", "main",
+            "--base", settings.base_branch,
             "--title", commit_message,
             "--body", body,
         ],

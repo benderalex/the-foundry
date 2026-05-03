@@ -20,6 +20,7 @@ class Settings:
     worktree_root: Path
     db_path: Path
     poll_interval_seconds: int
+    base_branch: str = "main"
     github_token: str | None = None
     issue_assignee: str | None = None
     issue_milestone: str | None = None
@@ -71,6 +72,7 @@ def load_settings(env_path: Path | None = None) -> Settings:
 
     source_repo = os.environ.get("SOURCE_REPO", "").strip()
     target_repo = os.environ.get("TARGET_REPO", "").strip()
+    base_branch = os.environ.get("BASE_BRANCH", "main").strip() or "main"
     if not source_repo or not target_repo:
         raise ConfigError("SOURCE_REPO and TARGET_REPO must be set (owner/name)")
 
@@ -83,6 +85,7 @@ def load_settings(env_path: Path | None = None) -> Settings:
     return Settings(
         source_repo=source_repo,
         target_repo=target_repo,
+        base_branch=base_branch,
         issue_label=issue_label,
         worktree_root=Path(os.environ.get("WORKTREE_ROOT", "./worktrees")).resolve(),
         db_path=Path(os.environ.get("DB_PATH", "./data/foundry.sqlite")).resolve(),
