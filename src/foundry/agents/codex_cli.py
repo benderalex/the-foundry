@@ -78,7 +78,7 @@ class CodexCliAgent:
     def _base_flags(self, worktree: Path) -> list[str]:
         flags = [
             "--json",
-            "--full-auto",
+            "--dangerously-bypass-approvals-and-sandbox",
             "--skip-git-repo-check",
             "-C",
             str(worktree),

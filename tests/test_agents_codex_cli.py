@@ -91,7 +91,7 @@ def test_apply_passes_model_and_worktree_to_cli(tmp_path: Path) -> None:
     cmd = run.call_args.args[0]
     assert cmd[cmd.index("-m") + 1] == "gpt-4o"
     assert cmd[cmd.index("-C") + 1] == str(tmp_path)
-    assert "--full-auto" in cmd
+    assert "--dangerously-bypass-approvals-and-sandbox" in cmd
     assert "--skip-git-repo-check" in cmd
     assert run.call_args.kwargs["cwd"] == tmp_path
 

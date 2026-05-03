@@ -49,7 +49,7 @@ services:
       - ${HOME}/.config/gh:/root/.config/gh:ro
       # Uncomment the auth directory for the real coding backend you use.
       # - ${HOME}/.claude:/root/.claude
-      # - ${HOME}/.codex:/root/.codex
+      - ${HOME}/.codex:/root/.codex
       # - ${HOME}/.local/share/opencode:/root/.local/share/opencode
     command: ["foundry", "run"]
     depends_on:
