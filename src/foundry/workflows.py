@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -277,8 +278,25 @@ def _format_pr_feedback(pr: dict[str, Any]) -> str:
     return "\n\n".join(parts).strip()
 
 
+def _gh_run_with_retry(cmd: list[str], retries: int = 3, backoff: float = 10.0) -> shell.Result:
+    """Run a gh command, retrying on network errors (i/o timeout, connection reset)."""
+    _log = structlog.get_logger()
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            return shell.run(cmd)
+        except shell.ShellError as exc:
+            network_error = "timeout" in exc.stderr.lower() or "connection" in exc.stderr.lower()
+            if not network_error or attempt == retries - 1:
+                raise
+            last_exc = exc
+            _log.warning("gh.network_retry", attempt=attempt + 1, stderr=exc.stderr[:120])
+            time.sleep(backoff * (attempt + 1))
+    raise last_exc  # type: ignore[misc]
+
+
 def _list_open_foundry_prs(settings: Settings) -> list[dict[str, Any]]:
-    result = shell.run(
+    result = _gh_run_with_retry(
         [
             "gh",
             "pr",
@@ -302,7 +320,7 @@ def _list_open_foundry_prs(settings: Settings) -> list[dict[str, Any]]:
 
 
 def _view_pr_feedback(settings: Settings, pr_number: int) -> dict[str, Any]:
-    result = shell.run(
+    result = _gh_run_with_retry(
         [
             "gh",
             "pr",
@@ -335,7 +353,11 @@ def _task_for_pr(settings: Settings, pr: dict[str, Any]) -> Task | None:
 def _prepare_pr_feedback_worktree(
     settings: Settings, task: Task, branch_name: str
 ) -> tuple[Path, Path]:
-    base = worktree.ensure_base_repo(settings.worktree_root, settings.source_repo)
+    base = worktree.ensure_base_repo(
+        settings.worktree_root,
+        settings.source_repo,
+        settings.base_branch,
+    )
     wt_path = (settings.worktree_root / f"task-{task.id}-pr-feedback").resolve()
     if wt_path.exists():
         worktree.cleanup_worktree(base, wt_path)
@@ -427,7 +449,11 @@ def _prepare_dev_worktree(settings: Settings, task: Task, base: Path) -> tuple[T
             expected_path=str(canonical_path),
         )
 
-    wt_path, branch_name = worktree.create_worktree(settings.worktree_root, task.id)
+    wt_path, branch_name = worktree.create_worktree(
+        settings.worktree_root,
+        task.id,
+        settings.base_branch,
+    )
     task.worktree_path = str(wt_path)
     task.branch_name = branch_name
     task = state.upsert_task(settings.db_path, task)
@@ -459,7 +485,11 @@ def dev_task(settings: Settings, task: Task) -> Task:
 
     _emit_synthetic_fetch_events(settings, task)
 
-    base = worktree.ensure_base_repo(settings.worktree_root, settings.source_repo)
+    base = worktree.ensure_base_repo(
+        settings.worktree_root,
+        settings.source_repo,
+        settings.base_branch,
+    )
     task, wt_path, branch_name = _prepare_dev_worktree(settings, task, base)
 
     # CONTEXT

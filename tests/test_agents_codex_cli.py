@@ -219,9 +219,16 @@ def test_codex_cli_emits_agent_events_during_apply(tmp_path: Path) -> None:
         },
     ]
 
+    def _stream(*args: object, **kwargs: object) -> list[dict]:
+        on_event = kwargs.get("on_event")
+        if callable(on_event):
+            for event in streamed:
+                on_event(event)
+        return streamed
+
     with patch(
         "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
-        return_value=streamed,
+        side_effect=_stream,
     ):
         result = agent.apply(task=task, worktree=tmp_path, input="")
 

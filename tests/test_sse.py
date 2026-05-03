@@ -66,7 +66,7 @@ def test_format_sse_shape() -> None:
     assert chunk.startswith("id: 5\n")
     assert "event: agent_text\n" in chunk
     assert chunk.endswith("\n\n")
-    data_line = [l for l in chunk.splitlines() if l.startswith("data: ")][0]
+    data_line = [line for line in chunk.splitlines() if line.startswith("data: ")][0]
     payload = json.loads(data_line.removeprefix("data: "))
     assert payload["stage"] == "agent_plan"
     assert payload["seq"] == 5

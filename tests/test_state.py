@@ -46,7 +46,7 @@ def test_list_tasks_filter_by_status(tmp_path: Path) -> None:
     db = tmp_path / "f.sqlite"
     state.init_db(db)
 
-    t1 = state.upsert_task(db, _make_task(1))
+    state.upsert_task(db, _make_task(1))
     t2 = state.upsert_task(db, _make_task(2))
     t2.status = TaskStatus.DONE
     state.upsert_task(db, t2)
