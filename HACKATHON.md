@@ -2,30 +2,33 @@
 
 ## 1. Pitch одной фразой
 
-**The Foundry — это «фабрика фичей» с прозрачным конвейером: GitHub issue заходит как сырьё, проходит линейный FSM (`fetch → context → plan → implement → verify → pr`) в изолированном git-worktree, и выходит готовым PR — а ты в реальном времени видишь в UI, что именно делает агент на каждом шаге, с полным append-only логом событий, инструментов и стоимости.**
-
-Ключевое отличие от «голого» Claude Code / Codex: оркестратор никому не доверяет на слово — есть детерминированный verify (тесты + линтер) перед LLM-ревьюером, чекпоинты diff'ов перед каждым retry, repo-memory между задачами, и pluggable backends (claude / codex / opencode → DeepSeek/OpenAI/OpenRouter), которые меняются одной env-переменной.
+The Foundry — это «фабрика фичей»: оркестратор, который превращает GitHub issue в изолированную работу агента, проверенный diff и готовый PR с наблюдаемым, перезапускаемым пайплайном.
 
 ---
 
 ## 2. Что сделано помимо ванильного `task → implement → PR`
 
-| Фича | Зачем |
-|------|-------|
-| **Стадия CONTEXT перед PLAN** | Анализ worktree (языки, манифесты, TF-IDF релевантных файлов, auto-detect test-команд) кладётся в промпт планировщика — без этого агент тратит ходы на «осмотреться». |
-| **Двухуровневый VERIFY** | Сначала детерминированные команды (pytest/ruff/cargo/npm/go), short-circuit при ненулевом rc — LLM-ревьюер не вызывается, экономим деньги и шум. LLM-ревьюер работает на diff целиком, независимо от тестов. |
-| **Retry-цикл с накоплением фидбэка** | До `MAX_IMPLEMENT_ATTEMPTS` попыток; каждая следующая получает план + резюме предыдущей попытки + отчёт верификатора. Без этого падающий тест = мёртвая задача. |
-| **Checkpoints перед каждым retry** | `git diff --binary HEAD` → `data/checkpoints/task-{id}-attempt-{n}.diff` до `git reset --hard`. Failed worktree не удаляется. Можно вытащить полезный diff даже из проваленной задачи. |
-| **Repo memory** | После каждой успешной задачи в SQLite пишутся `touched_files`, `verify_commands`, `common_failures`. На следующих задачах CONTEXT их читает и подкладывает в промпт. Эффект — агент быстрее находит «правильные» файлы и тесты. |
-| **NEED_VERIFICATION + BLOCKED + resume** | Если агент не может составить план или ревьюер вернул UNCLEAR — публикуем комментарий с вопросами в issue, ставим BLOCKED, ждём ответа. `POST /api/tasks/{id}/resume` или CLI `foundry reset <id>` возвращает задачу в очередь. Альтернатива — best-effort галлюцинации. |
-| **`pr-feedback` workflow** | Отдельный проход по открытым `foundry/task-*` PR: парсит `statusCheckRollup`, `CHANGES_REQUESTED`, последние комментарии → агент дописывает фиксы в ту же ветку. Дедупликация по хешу feedback-блока в repo_memory. |
-| **Pluggable coding agents** | `stub` (offline, детерм.), `claude_cli`, `codex_cli`, `opencode_cli`. Смена бэкенда — одна env-переменная. Per-stage модели (`AGENT_PLAN_MODEL=haiku`, `AGENT_IMPLEMENT_MODEL=sonnet`) — экономим на дешёвых стадиях. |
-| **Safe mode + security layer** | `SAFE_AGENT_MODE=true` по умолчанию (без `--dangerously-skip-permissions`), env scrubbing для subprocess, denylist на `rm -rf` / `git push -f` / `git checkout main` / `git reset --hard` вне worktree, sanity-check (>40 файлов или запрещённые пути → отказ коммита). |
-| **Append-only event log + SSE** | Все стадии и `agent_thinking`/`agent_tool`/`agent_text` события стримятся в SQLite, FastAPI отдаёт по SSE с `Last-Event-ID`. UI восстанавливает полный ход агента из БД, переживает рефреш. |
-| **React UI с live stepper'ом** | Не просто список задач: stepper по стадиям, раскрывающаяся карточка с потоком инструментов/выводов агента, страница repo memory. |
-| **Langfuse tracing (опц.)** | `@observe` декоратор на стадиях; каждая стадия = span с input/output/cost/tokens. |
-| **Приоритеты + фильтры выборки** | `priority/p0`/`p1` лейблы, `ISSUE_LABELS` (несколько), `ISSUE_ASSIGNEE`, `ISSUE_MILESTONE`, `ISSUE_LIMIT` — без правки кода можно сегментировать очередь. |
-| **Docker Compose из 3 сервисов** | `api` + `worker` + `web` одной командой; `gh` auth и agent auth монтируются с хоста. |
+Добавлен явный FSM-пайплайн: fetch → context → plan → implement → verify → pr → done. Это делает процесс не магическим вызовом LLM, а управляемой машиной состояний, которую можно продолжать после рестарта и отлаживать по стадиям.
+
+Есть отдельная стадия context: оркестратор анализирует репозиторий, языки, манифесты, релевантные файлы, тестовые команды и память прошлых задач. Это снижает шанс, что агент начнёт работать вслепую.
+
+Есть стадия plan до реализации. Если задача неоднозначна, агент может вернуть NEED_VERIFICATION, после чего пайплайн блокируется и публикует вопросы в issue. Это защита от уверенной реализации неправильной задачи.
+
+Реализация идёт в отдельном git worktree на ветке foundry/task-{id}. Это изолирует задачи друг от друга и от основной ветки.
+
+Сделан retry-loop implement → verify → implement: если тесты или LLM-review падают, следующая попытка получает отчёт предыдущей верификации и исправляет изменения.
+
+Верификация двухуровневая: сначала детерминированные команды вроде ruff, pytest, npm test, затем LLM-review по diff. Так агент не может «словами» переубедить упавшие тесты.
+
+Есть обработка PR feedback: отдельный runner читает requested changes, комментарии и failing CI checks, после чего агент дорабатывает ту же PR-ветку.
+
+Есть observability: append-only event log в SQLite, FastAPI, SSE и React UI с live-потоком действий агента, стадиями, статусами, input/output стадий, токенами и событиями tool/text/thinking.
+
+Есть pluggable agent backends: stub, claude_cli, codex_cli, opencode_cli. Это позволяет менять исполнителя без переписывания оркестратора.
+
+Есть safety-слой: scrubbed env для subprocess, safe agent mode, запрет опасных команд, sanity check перед PR, лимит изменённых файлов, checkpoints diff перед попытками.
+
+Есть repo memory: после успешных задач сохраняются touched files, verify commands и common failures, чтобы следующие задачи получали контекст накопленного опыта по репозиторию.
 
 ---
 
@@ -104,6 +107,7 @@
 - **Sanity-check на пути (`__pycache__`, `.venv/`).** Полезно, но проще было бы делегировать `.gitignore`-логике git'а, а не поддерживать свой список запрещённых путей.
 - **Polling SQLite в SSE-эндпоинте** для live-событий. Работает, но потребляет CPU на холостом ходу. Должна была быть `LISTEN/NOTIFY`-подобная схема (или хотя бы in-memory pub/sub в API-процессе) с самого начала; сейчас придётся менять.
 - **Поддержка одного `TARGET_REPO` с PR в чужой репо.** Красивая идея на бумаге, но в реальной работе sandbox=target почти всегда. Сложность в коде есть, ценность — нулевая.
+- Поддержка нескольких agent backends полезна, но у разных CLI разные форматы событий, resume-семантика и sandbox-флаги. Унификация оказалась дороже, чем выглядела на старте.
 
 ## 8. Пришлите ссылки, по которым можно посмотреть пример работы оркестратора: видео с демкой, исходную задачу, ход выполнения, созданный PR.
 Видео-демка работы оркестратора: https://www.loom.com/share/de2d7abbb7104649842b2ec1f53dfde4 (в демо использовалась задача https://github.com/podlodka-ai-club/the-foundry/issues/25, результирующий ПР по задаче https://github.com/podlodka-ai-club/the-foundry/pull/26). Так же, ход выполнения задачи можно посмотреть тут (на основе логов стадий plan/implement/verify): [task-25-execution.md](task-25-execution.md).
