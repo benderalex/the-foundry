@@ -14,7 +14,7 @@ from .base import (
     first_line,
 )
 from .config import AgentSettings
-from .streaming import _normalize_tool_event, iter_cli_jsonl
+from .streaming import _normalize_tool_event, iter_cli_jsonl_with_retry
 
 
 class ClaudeCliAgent:
@@ -73,13 +73,12 @@ class ClaudeCliAgent:
             model=self._settings.model or None,
             input=prompt,
         ) as gen:
-            events: list[dict[str, Any]] = []
-            for event in iter_cli_jsonl(
+            events = iter_cli_jsonl_with_retry(
                 cmd,
                 cwd=worktree,
                 env=scrubbed_agent_env(self.name),
-            ):
-                events.append(event)
+            )
+            for event in events:
                 self._emit_for(task, event)
 
             new_session_id = self._extract_session_id(events)

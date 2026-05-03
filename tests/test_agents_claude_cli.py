@@ -74,8 +74,8 @@ def test_apply_caches_session_id_and_resumes_next_call(tmp_path: Path) -> None:
     ]
     resume_events = [{"type": "result", "result": "followup"}]
 
-    with patch("foundry.agents.claude_cli.iter_cli_jsonl") as run:
-        run.side_effect = [iter(fresh_events), iter(resume_events)]
+    with patch("foundry.agents.claude_cli.iter_cli_jsonl_with_retry") as run:
+        run.side_effect = [list(fresh_events), list(resume_events)]
 
         first = agent.apply(task=task, worktree=tmp_path, input="initial")
         second = agent.apply(task=task, worktree=tmp_path, input="more")
@@ -94,8 +94,8 @@ def test_apply_passes_model_and_max_turns_to_cli(tmp_path: Path) -> None:
     agent = ClaudeCliAgent(settings=_settings(model="opus", max_turns=11))
 
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter([{"type": "result", "result": "ok"}]),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "result", "result": "ok"}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -110,8 +110,8 @@ def test_apply_can_opt_into_unsafe_claude_flag(tmp_path: Path) -> None:
     agent = ClaudeCliAgent(settings=_settings(safe_agent_mode=False))
 
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter([{"type": "result", "result": "ok"}]),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "result", "result": "ok"}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -122,8 +122,8 @@ def test_apply_runs_in_worktree_cwd(tmp_path: Path) -> None:
     agent = ClaudeCliAgent(settings=_settings())
 
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter([{"type": "result", "result": "ok"}]),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "result", "result": "ok"}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -189,8 +189,8 @@ def test_apply_populates_cost_and_tokens_from_result_event(tmp_path: Path) -> No
     ]
 
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter(streamed),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=streamed,
     ):
         out = agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -245,8 +245,8 @@ def test_claude_cli_emits_agent_tool_events_during_apply(tmp_path: Path) -> None
 
     # Act
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter(streamed),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=streamed,
     ):
         result = agent.apply(task=task, worktree=tmp_path, input="")
 
@@ -283,8 +283,8 @@ def test_claude_cli_skips_event_emission_without_db_path(tmp_path: Path) -> None
     ]
 
     with patch(
-        "foundry.agents.claude_cli.iter_cli_jsonl",
-        return_value=iter(streamed),
+        "foundry.agents.claude_cli.iter_cli_jsonl_with_retry",
+        return_value=streamed,
     ):
         # Should not raise even though db_path is None.
         out = agent.apply(task=_task(), worktree=tmp_path, input="")

@@ -58,6 +58,37 @@ services:
       api:
         condition: service_healthy
 
+  pr-feedback:
+    image: the-foundry-backend:local
+    build:
+      context: .
+      args:
+        INSTALL_CLAUDE_CLI: ${INSTALL_CLAUDE_CLI:-false}
+        INSTALL_CODEX_CLI: ${INSTALL_CODEX_CLI:-false}
+        INSTALL_OPENCODE_CLI: ${INSTALL_OPENCODE_CLI:-false}
+    env_file:
+      - .env
+    environment:
+      DB_PATH: /app/data/foundry.sqlite
+      WORKTREE_ROOT: /app/worktrees
+      PYTHONPATH: /app/src
+      CODEX_SANDBOX_MODE: ${CODEX_SANDBOX_MODE:-danger-full-access}
+      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-Foundry Bot}
+      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-foundry@example.local}
+      GIT_COMMITTER_NAME: ${GIT_COMMITTER_NAME:-Foundry Bot}
+      GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-foundry@example.local}
+    volumes:
+      - ./data:/app/data
+      - ./worktrees:/app/worktrees
+      - ${HOME}/.config/gh:/root/.config/gh:ro
+      # - ${HOME}/.claude:/root/.claude
+      - ${HOME}/.codex:/root/.codex
+      # - ${HOME}/.local/share/opencode:/root/.local/share/opencode
+    command: ["foundry", "pr-feedback"]
+    depends_on:
+      api:
+        condition: service_healthy
+
   web:
     build:
       context: ./web

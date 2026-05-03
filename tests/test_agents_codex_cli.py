@@ -66,8 +66,8 @@ def test_apply_uses_exec_for_fresh_and_resume_subcommand_next(tmp_path: Path) ->
         {"type": "item.completed", "item": {"type": "agent_message", "text": "again"}},
     ]
 
-    with patch("foundry.agents.codex_cli.iter_cli_jsonl") as run:
-        run.side_effect = [iter(fresh_events), iter(resume_events)]
+    with patch("foundry.agents.codex_cli.iter_cli_jsonl_with_retry") as run:
+        run.side_effect = [fresh_events, resume_events]
         first = agent.apply(task=task, worktree=tmp_path, input="hi")
         second = agent.apply(task=task, worktree=tmp_path, input="hi again")
 
@@ -86,10 +86,8 @@ def test_apply_passes_model_and_worktree_to_cli(tmp_path: Path) -> None:
     agent = CodexCliAgent(settings=_settings(model="gpt-4o"))
 
     with patch(
-        "foundry.agents.codex_cli.iter_cli_jsonl",
-        return_value=iter(
-            [{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}]
-        ),
+        "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -106,10 +104,8 @@ def test_apply_can_opt_into_unsafe_codex_flag(tmp_path: Path) -> None:
     agent = CodexCliAgent(settings=_settings(safe_agent_mode=False))
 
     with patch(
-        "foundry.agents.codex_cli.iter_cli_jsonl",
-        return_value=iter(
-            [{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}]
-        ),
+        "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -120,10 +116,8 @@ def test_apply_passes_configured_codex_sandbox_mode(tmp_path: Path) -> None:
     agent = CodexCliAgent(settings=_settings(sandbox_mode="danger-full-access"))
 
     with patch(
-        "foundry.agents.codex_cli.iter_cli_jsonl",
-        return_value=iter(
-            [{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}]
-        ),
+        "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
+        return_value=[{"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}],
     ) as run:
         agent.apply(task=_task(), worktree=tmp_path, input="")
 
@@ -136,7 +130,7 @@ def test_apply_propagates_cli_process_failures(tmp_path: Path) -> None:
     agent = CodexCliAgent(settings=_settings())
 
     with patch(
-        "foundry.agents.codex_cli.iter_cli_jsonl",
+        "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
         side_effect=CliProcessError(["codex"], 1, "bwrap: No permissions to create a new namespace"),
     ):
         try:
@@ -226,8 +220,8 @@ def test_codex_cli_emits_agent_events_during_apply(tmp_path: Path) -> None:
     ]
 
     with patch(
-        "foundry.agents.codex_cli.iter_cli_jsonl",
-        return_value=iter(streamed),
+        "foundry.agents.codex_cli.iter_cli_jsonl_with_retry",
+        return_value=streamed,
     ):
         result = agent.apply(task=task, worktree=tmp_path, input="")
 

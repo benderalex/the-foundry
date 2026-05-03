@@ -91,25 +91,50 @@ def run_issue(number: int) -> None:
 
 @main.command("pr-feedback")
 @click.option("--once", is_flag=True, help="Run a single PR feedback pass and exit.")
-def pr_feedback(once: bool) -> None:
-    """Apply review / CI feedback on open Foundry PR branches."""
-    if not once:
-        click.echo("foundry pr-feedback currently supports --once only", err=True)
-        sys.exit(2)
+@click.option(
+    "--interval",
+    type=int,
+    default=None,
+    help="Poll interval in seconds (overrides POLL_INTERVAL_SECONDS).",
+)
+def pr_feedback(once: bool, interval: int | None) -> None:
+    """Apply review / CI feedback on open Foundry PR branches.
+
+    By default runs forever, polling open Foundry PRs every
+    POLL_INTERVAL_SECONDS. Pass --once for a single pass.
+    """
     try:
         settings = load_settings()
     except ConfigError as e:
         click.echo(f"config error: {e}", err=True)
         sys.exit(2)
 
-    processed = workflows.pr_feedback_once(settings)
-    if not processed:
-        click.echo("no PR feedback to process")
+    sleep_s = interval if interval is not None else settings.poll_interval_seconds
+    log = structlog.get_logger()
+
+    def _one_pass() -> None:
+        processed = workflows.pr_feedback_once(settings)
+        if not processed:
+            return
+        for task in processed:
+            click.echo(
+                f"#{task.issue_number:>4}  {task.status.value:<8}  {task.current_stage.value:<10}  {task.pr_url or '-'}"
+            )
+
+    if once:
+        _one_pass()
         return
-    for task in processed:
-        click.echo(
-            f"#{task.issue_number:>4}  {task.status.value:<8}  {task.current_stage.value:<10}  {task.pr_url or '-'}"
-        )
+
+    click.echo(f"foundry pr-feedback: polling every {sleep_s}s (Ctrl+C to stop)")
+    try:
+        while True:
+            try:
+                _one_pass()
+            except Exception:
+                log.exception("pr_feedback.pass_failed")
+            time.sleep(sleep_s)
+    except KeyboardInterrupt:
+        click.echo("foundry pr-feedback: stopped")
 
 
 @main.command()

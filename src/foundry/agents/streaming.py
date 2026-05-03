@@ -2,12 +2,24 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Iterator
 
 import structlog
 
 log = structlog.get_logger(__name__)
+
+_RATE_LIMIT_SIGNALS = (
+    "rate limit",
+    "rate_limit",
+    "429",
+    "529",
+    "too many requests",
+    "overloaded",
+    "capacity",
+)
+_RETRY_DELAYS = (30, 60, 120)  # seconds between attempts
 
 MAX_TOOL_DETAIL_LEN = 100
 
@@ -44,6 +56,46 @@ _TOOL_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
     # TodoWrite is special-cased (count of todos) — no key lookup.
     "TodoWrite": (),
 }
+
+
+def _is_rate_limit_error(err: CliProcessError) -> bool:
+    text = err.stderr.lower()
+    return any(signal in text for signal in _RATE_LIMIT_SIGNALS)
+
+
+def iter_cli_jsonl_with_retry(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Run a streaming CLI command with rate-limit retry.
+
+    Unlike `iter_cli_jsonl`, collects all events into a list so the caller
+    gets a complete, consistent result even after a retry. Retries up to
+    ``len(_RETRY_DELAYS)`` times with exponential back-off when the process
+    exits with a rate-limit signal in stderr.
+    """
+    last_err: CliProcessError | None = None
+    for attempt, delay in enumerate(
+        [0] + list(_RETRY_DELAYS), start=1
+    ):
+        if delay:
+            log.warning(
+                "streaming.rate_limit_retry",
+                attempt=attempt,
+                delay_sec=delay,
+                cmd=cmd[0] if cmd else "",
+            )
+            time.sleep(delay)
+        try:
+            return list(iter_cli_jsonl(cmd, cwd=cwd, env=env))
+        except CliProcessError as exc:
+            if _is_rate_limit_error(exc):
+                last_err = exc
+                continue
+            raise
+    raise last_err  # type: ignore[misc]
 
 
 def iter_cli_jsonl(

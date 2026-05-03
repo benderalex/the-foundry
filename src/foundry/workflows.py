@@ -15,6 +15,7 @@ refuses to run agent-defined branches.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1034,8 +1035,18 @@ def pr_feedback(
         worktree.cleanup_worktree(base, wt_path)
 
 
+def _feedback_hash(feedback: str) -> str:
+    return hashlib.sha256(feedback.encode()).hexdigest()[:16]
+
+
 def pr_feedback_once(settings: Settings) -> list[Task]:
-    """Run one PR feedback pass for open `foundry/task-*` PRs."""
+    """Run one PR feedback pass for open `foundry/task-*` PRs.
+
+    Deduplication: the feedback string is hashed and stored in repo_memory as
+    ``pr_feedback_hash:{task_id}``. If the hash matches the last processed run,
+    the PR is skipped — avoids re-applying the same review comments on every
+    polling cycle.
+    """
     state.init_db(settings.db_path)
     processed: list[Task] = []
     for listed_pr in _list_open_foundry_prs(settings):
@@ -1051,5 +1062,23 @@ def pr_feedback_once(settings: Settings) -> list[Task]:
                 branch=pr.get("headRefName"),
             )
             continue
-        processed.append(pr_feedback(settings, task, pr, feedback))
+
+        # Skip if this exact feedback was already processed
+        hash_key = f"pr_feedback_hash:{task.id}"
+        current_hash = _feedback_hash(feedback)
+        stored = state.get_repo_memory(settings.db_path, settings.target_repo, hash_key)
+        if stored == current_hash:
+            log.info(
+                "workflow.pr_feedback.skip_unchanged",
+                task_id=task.id,
+                pr_number=pr.get("number"),
+            )
+            continue
+
+        result = pr_feedback(settings, task, pr, feedback)
+        # Persist hash so next pass skips unchanged feedback
+        state.save_repo_memory(
+            settings.db_path, settings.target_repo, hash_key, current_hash
+        )
+        processed.append(result)
     return processed
