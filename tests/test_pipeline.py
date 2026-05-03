@@ -35,12 +35,21 @@ def test_run_once_happy_path(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     state.init_db(settings.db_path)
     seeded = _seed_task(settings.db_path)
+    wt = tmp_path / "wt"
+
+    def _create_worktree(*_args):
+        wt.mkdir()
+        (wt / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+        (wt / "src").mkdir()
+        (wt / "src" / "thing.py").write_text("def do_the_thing():\n    pass\n", encoding="utf-8")
+        (wt / "tests").mkdir()
+        return wt, "foundry/task-1"
 
     with patch("foundry.pipeline.fetch_stage.fetch", return_value=[seeded]), \
          patch("foundry.workflows.worktree.ensure_base_repo", return_value=tmp_path / "base"), \
          patch(
              "foundry.workflows.worktree.create_worktree",
-             return_value=(tmp_path / "wt", "foundry/task-1"),
+             side_effect=_create_worktree,
          ), \
          patch("foundry.workflows.worktree.cleanup_worktree"), \
          patch(
@@ -71,6 +80,12 @@ def test_run_once_happy_path(tmp_path: Path) -> None:
         assert stage_name in per_stage_kinds, f"no events for stage {stage_name}"
         assert per_stage_kinds[stage_name][0] == "stage_started"
         assert per_stage_kinds[stage_name][-1] == "stage_finished"
+    context_finished = next(e for e in events if e.stage == "context" and e.kind == "stage_finished")
+    assert context_finished.payload["output"]["manifest_files"] == ["pyproject.toml"]
+    assert context_finished.payload["output"]["files"] == ["src/thing.py"]
+    plan_started = next(e for e in events if e.stage == "plan" and e.kind == "stage_started")
+    assert "## Repository context" in plan_started.payload["input"]["prompt"]
+    assert "`src/thing.py`" in plan_started.payload["input"]["prompt"]
 
 
 def test_fetch_events_are_not_duplicated_on_rerun(tmp_path: Path) -> None:

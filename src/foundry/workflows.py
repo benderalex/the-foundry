@@ -436,8 +436,8 @@ def dev_task(settings: Settings, task: Task) -> Task:
     if ctx is None:
         task = _mark(settings, task, stage=Stage.CONTEXT)
         with stage_span(settings.db_path, task.id, Stage.CONTEXT.value) as finish:
-            ctx = context_stage.run(task, settings)
-            finish(output={"files": len(ctx.get("files", []))})
+            ctx = context_stage.run(task, settings, repo_path=wt_path)
+            finish(output=ctx)
         state.save_stage_result(settings.db_path, task.id, Stage.CONTEXT, ctx)
         state.append_log(settings.db_path, task.id, Stage.CONTEXT, {"ok": True})
 
@@ -453,7 +453,8 @@ def dev_task(settings: Settings, task: Task) -> Task:
             title=task.issue_title,
             description=task.issue_body,
         )
-        plan_prompt = build_fresh_prompt(AgentStage.PLAN, plan_agent_task, "")
+        plan_input = context_stage.format_for_prompt(ctx)
+        plan_prompt = build_fresh_prompt(AgentStage.PLAN, plan_agent_task, plan_input)
         with stage_span(
             settings.db_path,
             task.id,
