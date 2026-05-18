@@ -27,6 +27,7 @@ class Settings:
     issue_labels: tuple[str, ...] = ()
     issue_limit: int = 50
     max_implement_attempts: int = 2
+    auto_create_pr: bool = True
     verify_commands: tuple[tuple[str, ...], ...] | None = None
     verify_command_timeout_sec: int = 300
     verify_diff_max_bytes: int = 200_000
@@ -96,6 +97,8 @@ def load_settings(env_path: Path | None = None) -> Settings:
         issue_labels=issue_labels,
         issue_limit=int(os.environ.get("ISSUE_LIMIT", "50")),
         max_implement_attempts=int(os.environ.get("MAX_IMPLEMENT_ATTEMPTS", "2")),
+        auto_create_pr=os.environ.get("AUTO_CREATE_PR", "1").strip().lower()
+        not in ("0", "false", "no"),
         verify_commands=_parse_verify_commands(os.environ.get("VERIFY_COMMANDS", "")),
         verify_command_timeout_sec=int(
             os.environ.get("VERIFY_COMMAND_TIMEOUT_SEC", "300")

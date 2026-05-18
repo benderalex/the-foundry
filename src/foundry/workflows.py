@@ -721,20 +721,23 @@ def dev_task(settings: Settings, task: Task) -> Task:
         # Otherwise: retryable failure with remaining budget — loop.
 
     # PR
-    pr_result = state.get_stage_result(settings.db_path, task.id, Stage.PR)
-    if pr_result is None:
-        task = _mark(settings, task, stage=Stage.PR)
-        with stage_span(settings.db_path, task.id, Stage.PR.value) as finish:
-            pr_result = pr_stage.run(
-                task, wt_path, branch_name, settings, report=decision.report
-            )
-            task.pr_url = pr_result["pr_url"]
-            finish(output={"pr_url": pr_result["pr_url"]})
-        state.save_stage_result(settings.db_path, task.id, Stage.PR, pr_result)
-        state.append_log(settings.db_path, task.id, Stage.PR, pr_result)
-        _save_successful_pr_memory(settings, task, pr_result, ctx)
+    if not settings.auto_create_pr:
+        log.info("workflow.dev_task.pr_skipped", task_id=task.id, reason="AUTO_CREATE_PR=false")
     else:
-        task.pr_url = pr_result.get("pr_url")
+        pr_result = state.get_stage_result(settings.db_path, task.id, Stage.PR)
+        if pr_result is None:
+            task = _mark(settings, task, stage=Stage.PR)
+            with stage_span(settings.db_path, task.id, Stage.PR.value) as finish:
+                pr_result = pr_stage.run(
+                    task, wt_path, branch_name, settings, report=decision.report
+                )
+                task.pr_url = pr_result["pr_url"]
+                finish(output={"pr_url": pr_result["pr_url"]})
+            state.save_stage_result(settings.db_path, task.id, Stage.PR, pr_result)
+            state.append_log(settings.db_path, task.id, Stage.PR, pr_result)
+            _save_successful_pr_memory(settings, task, pr_result, ctx)
+        else:
+            task.pr_url = pr_result.get("pr_url")
 
     task = _mark(settings, task, stage=Stage.DONE, status=TaskStatus.DONE)
     worktree.cleanup_worktree(base, wt_path)
