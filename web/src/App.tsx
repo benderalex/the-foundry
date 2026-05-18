@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Inbox } from "lucide-react";
 
@@ -50,6 +50,15 @@ export default function App(): JSX.Element {
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  }
 
   const tasksQuery = useQuery({
     queryKey: ["tasks"],
@@ -97,6 +106,8 @@ export default function App(): JSX.Element {
         <Topbar
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
+          theme={theme}
+          onThemeToggle={toggleTheme}
         />
         <FilterBar value={filter} onChange={setFilter} counts={counts} />
         <TableHeader />
