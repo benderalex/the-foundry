@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { Play, Search, RefreshCw } from "lucide-react";
+import { Play, Search, RefreshCw, Sun, Moon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { triggerFetch } from "../api";
@@ -8,11 +8,15 @@ import { triggerFetch } from "../api";
 interface TopbarProps {
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
+  theme: "dark" | "light";
+  onThemeToggle: () => void;
 }
 
 export default function Topbar({
   searchQuery,
   onSearchQueryChange,
+  theme,
+  onThemeToggle,
 }: TopbarProps): JSX.Element {
   const queryClient = useQueryClient();
   const [pulling, setPulling] = useState(false);
@@ -49,6 +53,14 @@ export default function Topbar({
           onChange={(event) => onSearchQueryChange(event.target.value)}
         />
       </div>
+
+      <button
+        className="topbar-btn"
+        onClick={onThemeToggle}
+        title={theme === "dark" ? "Переключить на светлую тему" : "Переключить на тёмную тему"}
+      >
+        {theme === "dark" ? <Sun /> : <Moon />}
+      </button>
 
       <button
         className="topbar-btn"

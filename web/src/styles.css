@@ -5,37 +5,37 @@
 :root {
   color-scheme: dark light;
   /* DARK (default) — тёплая угольная эстетика Codex */
-  --bg-0: #1a1816;           /* основной фон */
-  --bg-1: #201e1b;           /* панели, карточки */
-  --bg-2: #26231f;           /* hover, активные строки */
-  --bg-3: #2e2a25;           /* borders, dividers на фоне */
+  --bg-0: #1E1C17;           /* основной фон */
+  --bg-1: #26241E;           /* панели, карточки */
+  --bg-2: #332E24;           /* hover, активные строки */
+  --bg-3: #3B362C;           /* borders, dividers на фоне */
   --bg-sidebar: #19171410;
 
-  --fg-0: #e8e6e3;           /* primary text */
-  --fg-1: #b5b1ab;           /* secondary */
-  --fg-2: #928c83;           /* tertiary — ≥ 4.5:1 on --bg-0/1 */
-  --fg-3: #73695e;           /* very muted but still readable (~3:1) */
+  --fg-0: #EAE3D2;           /* primary text */
+  --fg-1: #C6BCA5;           /* secondary */
+  --fg-2: #8C8371;           /* tertiary — ≥ 4.5:1 on --bg-0/1 */
+  --fg-3: #6C6455;           /* very muted but still readable (~3:1) */
 
-  --border: #2e2a25;
-  --border-soft: #26231f;
-  --border-strong: #3a352f;
+  --border: #3B362C;
+  --border-soft: #2E2A22;
+  --border-strong: #4A4537;
 
   --accent: #d97757;         /* Codex orange */
-  --accent-soft: #d9775722;
+  --accent-soft: #d9775724;
   --accent-dim: #b5614a;
 
-  --success: #7aa87a;
-  --success-soft: #7aa87a1f;
-  --danger: #c96b5a;
-  --danger-soft: #c96b5a1f;
+  --success: #2E8555;
+  --success-soft: #2E855524;
+  --danger: #DC4141;
+  --danger-soft: #DC414124;
   --warning: #c99d5a;
   --info: #7a9bb5;
 
-  --running: #d9a857;        /* янтарный для RUNNING */
-  --running-soft: #d9a85722;
+  --running: #D97757;        /* оранжевый = accent для RUNNING */
+  --running-soft: #D9775724;
 
-  --highlight: #8b6fa1;      /* фиолетово-сливовый для выделений */
-  --highlight-soft: #8b6fa11f;
+  --highlight: #E6B85A;      /* жёлтый для thinking */
+  --highlight-soft: #E6B85A24;
 
   --diff-add: #6a9a6a;
   --diff-del: #b56a5a;
@@ -55,83 +55,83 @@
 /* Автодетект: если система в light и нет ручного override data-theme="dark" */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg-0: #faf8f5;
-    --bg-1: #f4f1eb;
-    --bg-2: #ecebe6;
-    --bg-3: #e0ddd4;
+    --bg-0: #F9F5EC;
+    --bg-1: #FEFBF2;
+    --bg-2: #F1EADB;
+    --bg-3: #E4DCC6;
     --bg-sidebar: #e8e5e0;
 
-    --fg-0: #1c1a17;
-    --fg-1: #4a4640;
-    --fg-2: #7a746b;
-    --fg-3: #a59e93;
+    --fg-0: #29261B;
+    --fg-1: #4D4838;
+    --fg-2: #7C745E;
+    --fg-3: #A29884;
 
-    --border: #e0ddd4;
-    --border-soft: #ebe8e2;
-    --border-strong: #cdc8bf;
+    --border: #E4DCC6;
+    --border-soft: #EEE6D2;
+    --border-strong: #C9BEA0;
 
-    --accent: #c96442;
-    --accent-soft: #c9644218;
+    --accent: #C65A2F;
+    --accent-soft: #C65A2F24;
     --accent-dim: #9a4a31;
 
-    --success: #4f7d4f;
-    --success-soft: #4f7d4f18;
-    --danger: #a84a3a;
-    --danger-soft: #a84a3a18;
+    --success: #2E8555;
+    --success-soft: #2E855524;
+    --danger: #B83535;
+    --danger-soft: #B8353524;
     --warning: #a8823a;
     --info: #4a6e8a;
 
-    --running: #c98a2f;
-    --running-soft: #c98a2f18;
+    --running: #C65A2F;
+    --running-soft: #C65A2F24;
 
-    --highlight: #6f4f8a;
-    --highlight-soft: #6f4f8a18;
+    --highlight: #9C7A1F;
+    --highlight-soft: #9C7A1F24;
 
     --diff-add: #3e7a3e;
     --diff-del: #9a4a3a;
 
-    --shadow-lg: 0 8px 32px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
+    --shadow-lg: 0 4px 20px rgba(40,30,15,.06);
     --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
   }
 }
 
 [data-theme="light"] {
-  --bg-0: #faf8f5;
-  --bg-1: #f4f1eb;
-  --bg-2: #ecebe6;
-  --bg-3: #e0ddd4;
+  --bg-0: #F9F5EC;
+  --bg-1: #FEFBF2;
+  --bg-2: #F1EADB;
+  --bg-3: #E4DCC6;
   --bg-sidebar: #e8e5e0;
 
-  --fg-0: #1c1a17;
-  --fg-1: #4a4640;
-  --fg-2: #7a746b;
-  --fg-3: #a59e93;
+  --fg-0: #29261B;
+  --fg-1: #4D4838;
+  --fg-2: #7C745E;
+  --fg-3: #A29884;
 
-  --border: #e0ddd4;
-  --border-soft: #ebe8e2;
-  --border-strong: #cdc8bf;
+  --border: #E4DCC6;
+  --border-soft: #EEE6D2;
+  --border-strong: #C9BEA0;
 
-  --accent: #c96442;
-  --accent-soft: #c9644218;
+  --accent: #C65A2F;
+  --accent-soft: #C65A2F24;
   --accent-dim: #9a4a31;
 
-  --success: #4f7d4f;
-  --success-soft: #4f7d4f18;
-  --danger: #a84a3a;
-  --danger-soft: #a84a3a18;
+  --success: #2E8555;
+  --success-soft: #2E855524;
+  --danger: #B83535;
+  --danger-soft: #B8353524;
   --warning: #a8823a;
   --info: #4a6e8a;
 
-  --running: #c98a2f;
-  --running-soft: #c98a2f18;
+  --running: #C65A2F;
+  --running-soft: #C65A2F24;
 
-  --highlight: #6f4f8a;
-  --highlight-soft: #6f4f8a18;
+  --highlight: #9C7A1F;
+  --highlight-soft: #9C7A1F24;
 
   --diff-add: #3e7a3e;
   --diff-del: #9a4a3a;
 
-  --shadow-lg: 0 8px 32px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-lg: 0 4px 20px rgba(40,30,15,.06);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
 }
 
@@ -201,10 +201,11 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 5px;
   padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .01em;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
   line-height: 16px;
   white-space: nowrap;
 }
@@ -310,7 +311,7 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; gap: 10px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-0);
+  background: var(--bg-1);
   position: sticky; top: 0; z-index: 10;
   min-height: 44px;
 }
