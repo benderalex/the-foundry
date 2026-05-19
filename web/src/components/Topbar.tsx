@@ -67,7 +67,6 @@ export default function Topbar({
         onClick={handlePull}
         disabled={pulling}
         title="Подтянуть задачи из GitHub"
-        style={{ minWidth: 90 }}
       >
         <RefreshCw style={{ animation: pulling ? "spinner .8s linear infinite" : undefined }} />
         {pullResult !== null ? pullResult : pulling ? "…" : "Pull"}
